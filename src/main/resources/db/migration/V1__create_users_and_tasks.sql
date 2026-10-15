@@ -1,0 +1,29 @@
+CREATE TABLE users (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    full_name VARCHAR(100) NOT NULL,
+    email VARCHAR(254) NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    CONSTRAINT pk_users PRIMARY KEY (id),
+    CONSTRAINT uk_users_email UNIQUE (email)
+);
+
+CREATE TABLE tasks (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    title VARCHAR(150) NOT NULL,
+    description VARCHAR(2000),
+    priority VARCHAR(16) NOT NULL,
+    status VARCHAR(16) NOT NULL,
+    due_date DATE,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    user_id BIGINT NOT NULL,
+    CONSTRAINT pk_tasks PRIMARY KEY (id),
+    CONSTRAINT fk_tasks_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT ck_tasks_priority CHECK (priority IN ('LOW', 'MEDIUM', 'HIGH')),
+    CONSTRAINT ck_tasks_status CHECK (status IN ('PENDING', 'IN_PROGRESS', 'COMPLETED'))
+);
+
+CREATE INDEX idx_tasks_user_created_at ON tasks (user_id, created_at);
+CREATE INDEX idx_tasks_user_status_due_date ON tasks (user_id, status, due_date);
+CREATE INDEX idx_tasks_user_priority ON tasks (user_id, priority);
