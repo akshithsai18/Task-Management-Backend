@@ -1,21 +1,20 @@
 # Task Manager API
 
-Java 21 / Spring Boot 3 REST API for the Daymark React frontend. It uses MySQL, Spring Data JPA, Flyway, stateless Spring Security, BCrypt, and signed short-lived JWT access tokens. Every task operation is scoped to the authenticated user.
+Java 21 / Spring Boot 3 REST API for the Daymark React frontend. It uses PostgreSQL, Spring Data JPA, Flyway, stateless Spring Security, BCrypt, and signed short-lived JWT access tokens. Every task operation is scoped to the authenticated user.
 
 ## Requirements and startup
 
-Install JDK 21, Maven 3.9+, and MySQL 8+. Create the database and local app user:
+Install JDK 21, Maven 3.9+, and PostgreSQL 13+. Create the local database and app user in `psql`:
 
 ```sql
-CREATE DATABASE task_manager CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-CREATE USER 'task_app'@'localhost' IDENTIFIED BY 'choose-a-local-password';
-GRANT ALL PRIVILEGES ON task_manager.* TO 'task_app'@'localhost';
+CREATE USER task_app WITH PASSWORD 'choose-a-local-password';
+CREATE DATABASE task_manager OWNER task_app;
 ```
 
 Copy `.env.example` as a reference, then set the environment variables in your PowerShell session or IDE run configuration. Spring Boot does not load `.env` files automatically. Never commit real credentials.
 
 ```powershell
-$env:DB_URL = 'jdbc:mysql://localhost:3306/task_manager?serverTimezone=UTC'
+$env:DB_URL = 'jdbc:postgresql://localhost:5432/task_manager?sslmode=disable'
 $env:DB_USERNAME = 'task_app'
 $env:DB_PASSWORD = 'your-local-password'
 $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
@@ -29,9 +28,17 @@ mvn test
 mvn spring-boot:run
 ```
 
-The API listens at `http://localhost:8080`; check `http://localhost:8080/actuator/health`. Tests use isolated in-memory H2 and need neither MySQL nor real secrets.
+The API listens at `http://localhost:8080`; check `http://localhost:8080/actuator/health`. Tests use isolated H2 in PostgreSQL compatibility mode and run the Flyway migration; they need neither PostgreSQL nor real secrets.
 
-Flyway applies versioned SQL migrations. Hibernate uses `ddl-auto: validate`, so it checks rather than changes the schema. Keep production schema changes in reviewed, immutable Flyway migrations; do not use Hibernate `update` in production.
+Flyway applies versioned PostgreSQL SQL migrations. Hibernate uses `ddl-auto: validate`, so it checks rather than changes the schema. Keep production schema changes in reviewed, immutable Flyway migrations; do not use Hibernate `update` in production.
+
+## Deploy to Render
+
+The backend is a separate Git repository. Push this `backend/` repository to its own GitHub repo, then create a Render Blueprint from that repo. The root `render.yaml` provisions the Docker web service and a same-region Render Postgres database. Render's `DATABASE_URL` is converted at startup to a pgJDBC URL, credentials are not logged, and TLS is required for the database connection. Render generates `JWT_SECRET`; during Blueprint setup, provide `CORS_ALLOWED_ORIGINS` as the exact deployed frontend origin, for example `https://your-app.vercel.app` (no trailing slash and no wildcard).
+
+The Blueprint uses free web compute, which can spin down while idle, and the smallest paid Postgres plan so the database persists. Render's free Postgres expires after 30 days and is deleted after its 14-day recovery window; do not choose the free database plan for data you need to keep. Review Render's current pricing before applying the Blueprint.
+
+For a manually created Render Postgres instance, set the web service's `DATABASE_URL` to its **internal** connection string and keep the web service and database in the same Render region. Set the health-check path to `/actuator/health`. For local development, use the separate `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` settings shown above.
 
 ## Security
 

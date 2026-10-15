@@ -3,10 +3,12 @@ package com.example.taskmanager;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.taskmanager.dto.LoginRequest;
@@ -79,6 +81,11 @@ class TaskManagerIntegrationTest {
                 .andExpect(jsonPath("$.email").value("login@example.com"))
                 .andExpect(jsonPath("$.password").doesNotExist());
 
+        mockMvc.perform(get("/api/users/me").header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName").value("Login User"));
+        mockMvc.perform(get("/api/users/me")).andExpect(status().isUnauthorized());
+
         mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content(loginJson("login@example.com", "WrongPassword123")))
                 .andExpect(status().isUnauthorized())
@@ -134,6 +141,9 @@ class TaskManagerIntegrationTest {
 
         mockMvc.perform(get("/api/tasks/{id}", taskId).header("Authorization", bearer(otherToken)))
                 .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/tasks/{id}", taskId).header("Authorization", bearer(ownerToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Owned urgent task"));
 
         mockMvc.perform(put("/api/tasks/{id}", taskId)
                         .header("Authorization", bearer(ownerToken))
@@ -196,6 +206,19 @@ class TaskManagerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalTasks").value(0))
                 .andExpect(jsonPath("$.completionPercentage").value(0.0));
+    }
+
+    @Test
+    void healthIsPublicAndFrontendCorsPreflightIsAllowed() throws Exception {
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
+
+        mockMvc.perform(options("/api/tasks")
+                        .header("Origin", "http://localhost:5173")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
     }
 
     private void register(String name, String email, String password) throws Exception {

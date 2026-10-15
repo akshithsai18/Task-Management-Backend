@@ -1,0 +1,24 @@
+databases:
+  - name: task-manager-postgres
+    databaseName: task_manager
+    user: task_manager
+    region: oregon
+    plan: 0.1c-256mb
+
+services:
+  - type: web
+    name: task-manager-api
+    runtime: docker
+    region: oregon
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: task-manager-postgres
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
